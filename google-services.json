@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "931444482872",
+    "project_id": "cafeina-cafe-app",
+    "storage_bucket": "cafeina-cafe-app.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931444482872:android:9f049a7ac3a0d7d242d7cd",
+        "android_client_info": {
+          "package_name": "com.iicdev.CafeinaCafeAdminApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6dYviMLxisVSdckCID3rSNR_4IIEApUE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931444482872:android:07700be798805c3842d7cd",
+        "android_client_info": {
+          "package_name": "com.iicdev.CafeinaCafeApp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD6dYviMLxisVSdckCID3rSNR_4IIEApUE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

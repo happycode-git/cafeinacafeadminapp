@@ -35,6 +35,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import ReactNativeAsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -56,12 +57,8 @@ import {
   updateDoc,
   limit,
   setDoc,
+  where,
 } from "firebase/firestore";
-import {
-  StripeProvider,
-  presentPaymentSheet,
-  usePaymentSheet,
-} from "@stripe/stripe-react-native";
 // #endregion
 
 // CONSTANTS
@@ -78,26 +75,23 @@ export function randomString(length) {
   }
   return result;
 }
-export const c_projectID = "e4044789-90d5-4a16-829a-79b8868a1a43";
+export const c_projectID = "92e20733-ff79-49a4-a997-92a07d219a9a";
 export const c_googleMapsAPI = "AIzaSyBtE2qvx3l_A-a5ldpcFvQHu7qdT9CMVH4";
+export const publishableKey =
+  "pk_test_51NuJfZIDyFPNiK5CPKgovhg5fen3VM4SzxvBqdYAfwriYKzoqacsfIOiNAt5ErXss3eHYF45ak5PPFHeAD0AXit900imYxFTry";
+export const serverAPIURL = "https://garnet-private-hisser.glitch.me";
+export const appName = "IICCoffeeShopDemoy";
+export const coords = { latitude: 32.74993, longitude: -117.0952 };
 export var me = {};
 export var myID = "test";
 export var myToken = "";
-export var stripePublishableKey =
-  "pk_test_51NuJfZIDyFPNiK5CPKgovhg5fen3VM4SzxvBqdYAfwriYKzoqacsfIOiNAt5ErXss3eHYF45ak5PPFHeAD0AXit900imYxFTry";
-export var serverURL = "https://garnet-private-hisser.glitch.me";
-
-// APP INFO
-export var appName = "Happy Code Dev";
+export var bus = {
+  Name: "Cafeina Cafe",
+  Image: require("../../assets/logo.png"),
+};
 
 // COMPONENTS
-export function SafeArea({
-  statusBar,
-  loading,
-  children,
-  backgroundColor,
-  styles,
-}) {
+export function SafeArea({ statusBar, loading, children, styles }) {
   return (
     <View
       style={[
@@ -105,8 +99,6 @@ export function SafeArea({
           flex: 1,
           paddingTop: Platform.OS === "ios" ? 50 : 35,
           paddingBottom: Platform.OS === "ios" ? 35 : 10,
-          backgroundColor:
-            backgroundColor !== undefined ? backgroundColor : "white",
         },
         styles,
       ]}
@@ -136,9 +128,7 @@ export function Grid({ columns, children, styles }) {
   const rows = Math.ceil(childrenArray.length / columns);
 
   return (
-    <View
-      style={[{ flex: 1, flexDirection: "column", flexWrap: "wrap" }, styles]}
-    >
+    <View style={[{ flexDirection: "column", flexWrap: "wrap" }, styles]}>
       {Array.from({ length: rows }).map((_, rowIndex) => (
         <View key={rowIndex} style={{ flexDirection: "row" }}>
           {childrenArray
@@ -256,8 +246,8 @@ export function ButtonOne({
   backgroundColor,
   radius,
   padding,
-  width,
   onPress,
+  width,
   styles,
 }) {
   return (
@@ -269,7 +259,7 @@ export function ButtonOne({
               backgroundColor !== undefined ? backgroundColor : "black",
             borderRadius: radius !== undefined ? radius : 6,
             padding: padding !== undefined ? padding : 14,
-            width: width !== undefined ? width : "100%",
+            width: width !== undefined ? width : "auto",
           },
           styles,
         ]}
@@ -434,7 +424,7 @@ export function TextFieldOne({
       value={value}
       secureTextEntry={isPassword}
       autoCapitalize={autoCap ? "sentences" : "none"}
-      keyboardType={isNum ? "number-pad" : "default"}
+      keyboardType={isNum ? "decimal-pad" : "default"}
       style={[
         {
           padding: 14,
@@ -567,18 +557,27 @@ export function DropdownOne({ options, radius, value, setter, styles }) {
     </View>
   );
 }
-export function CheckboxOne({ value, setter, text }) {
+export function CheckboxOne({ value, setter, text, textSize }) {
   function onCheck() {
     setter(!value);
   }
   return (
     <View style={[layout.horizontal]}>
       <CheckBox value={value} onValueChange={onCheck} />
-      <Text style={[sizes.medium_text]}>{text}</Text>
+      <Text style={[{ fontSize: textSize !== undefined ? textSize : 14 }]}>
+        {text}
+      </Text>
     </View>
   );
 }
-export function SegmentedPicker({ options, value, setter, backgroundColor }) {
+export function SegmentedPicker({
+  options,
+  value,
+  setter,
+  backgroundColor,
+  color,
+  size,
+}) {
   return (
     <View style={[layout.horizontal]}>
       {options.map((option, i) => {
@@ -588,7 +587,7 @@ export function SegmentedPicker({ options, value, setter, backgroundColor }) {
             style={[
               {
                 paddingVertical: 12,
-                paddingHorizontal: 16,
+                paddingHorizontal: 18,
                 borderRadius: 50,
                 backgroundColor:
                   value === option
@@ -604,8 +603,15 @@ export function SegmentedPicker({ options, value, setter, backgroundColor }) {
           >
             <Text
               style={[
-                { color: value === option ? "white" : "black" },
-                sizes.medium_text,
+                {
+                  color:
+                    value === option
+                      ? "white"
+                      : color !== undefined
+                      ? color
+                      : "black",
+                  fontSize: size !== undefined ? size : 14,
+                },
               ]}
             >
               {option}
@@ -1199,100 +1205,6 @@ export function DateTime({ date, time, setDate, setTime }) {
     </View>
   );
 }
-export function PaymentView({ children, showPayButton, total, successFunc }) {
-  const [pi, setPi] = useState("");
-  const [stripeLoading, setStripeLoading] = useState(false);
-  const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
-  const newTotal = total !== undefined ? total : 1000;
-  //
-  const fetchPaymentSheetParams = async () => {
-    const customerID = me.CustomerID !== undefined ? me.CustomerID : null;
-    const response = await fetch(`${serverURL}/payment-sheet`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        customerId: customerID,
-        total: newTotal, // Pass existing CustomerID if available
-      }),
-    });
-
-    const { paymentIntent, ephemeralKey, customer } = await response.json();
-    setPi(`${paymentIntent.split("_")[0]}_${paymentIntent.split("_")[1]}`);
-
-    return {
-      paymentIntent,
-      ephemeralKey,
-      customer,
-    };
-  };
-  const initializePaymentSheet = async () => {
-    const { paymentIntent, ephemeralKey, customer } =
-      await fetchPaymentSheetParams();
-
-    const { error } = await initPaymentSheet({
-      merchantDisplayName: appName,
-      customerId: customer,
-      customerEphemeralKeySecret: ephemeralKey,
-      paymentIntentClientSecret: paymentIntent,
-      allowsDelayedPaymentMethods: true,
-      // applePay: {
-      //   merchantCountryCode: "usd",
-      // },
-      // googlePay: {
-      //   merchantCountryCode: "usd",
-      //   testEnv: true,
-      //   currencyCode: "usd",
-      // },
-    });
-    if (!error) {
-      if (me.CustomerID === undefined) {
-        console.log(ephemeralKey);
-        firebase_UpdateDocument(setStripeLoading, "Users", me.id, {
-          CustomerID: customer,
-        });
-      }
-      setStripeLoading(true);
-    }
-  };
-  const openPaymentSheet = async () => {
-    const { error } = await presentPaymentSheet();
-
-    if (error) {
-      Alert.alert(`Error code: ${error.code}`, error.message);
-    } else {
-      successFunc();
-    }
-  };
-
-  useEffect(() => {
-    initializePaymentSheet();
-  }, []);
-
-  return (
-    <StripeProvider
-      publishableKey={stripePublishableKey}
-      merchantIdentifier={`iicdev.com.${appName}`}
-    >
-      <View>{children}</View>
-      <View style={[layout.absolute, { bottom: 25, right: 0, left: 0 }]}>
-        {showPayButton && stripeLoading && (
-          <ButtonOne
-            backgroundColor={"#117DFA"}
-            radius={0}
-            onPress={openPaymentSheet}
-          >
-            <View style={[layout.separate_horizontal]}>
-              <Text style={[colors.white, sizes.small_text]}>Pay Now</Text>
-              <Icon name={"arrow-forward-outline"} size={20} color={"white"} />
-            </View>
-          </ButtonOne>
-        )}
-      </View>
-    </StripeProvider>
-  );
-}
 
 // FUNCTIONS
 export async function function_PickImage(setLoading, setImage) {
@@ -1349,7 +1261,7 @@ export async function function_NotificationsSetup() {
     return;
   }
 
-  const pushTokenData = await Notifications.getExpoPushTokenAsync({
+  const pushTokenData = await Notifications.getDevicePushTokenAsync({
     projectId: c_projectID,
   });
   console.log(pushTokenData);
@@ -1580,13 +1492,13 @@ export const backgrounds = StyleSheet.create({
 // AUTH
 // Config
 const firebaseConfig = {
-  apiKey: "AIzaSyDR8zoNJPj1AC5xRbuD92BCACDADPAnpJM",
-  authDomain: "iic-appline-library.firebaseapp.com",
-  projectId: "iic-appline-library",
-  storageBucket: "iic-appline-library.appspot.com",
-  messagingSenderId: "592200952214",
-  appId: "1:592200952214:web:37732adf2306768ff655b7",
-  measurementId: "G-YKNCN415JB",
+  apiKey: "AIzaSyBhMIp7U6l-nrbT5ySebfBko8vBMzVEMjo",
+  authDomain: "cafeina-cafe-app.firebaseapp.com",
+  projectId: "cafeina-cafe-app",
+  storageBucket: "cafeina-cafe-app.appspot.com",
+  messagingSenderId: "931444482872",
+  appId: "1:931444482872:web:a445262fbfba929142d7cd",
+  measurementId: "G-RNR9GZQPKQ"
 };
 // Initializations
 const app = initializeApp(firebaseConfig);
@@ -1657,13 +1569,17 @@ export function auth_SignIn(
       Alert.alert("Invalid Login", errorMessage);
     });
 }
-export function auth_SignOut(setLoading, navigation, redirect) {
+export function auth_SignOut(setLoading, navigation, params, redirect) {
   signOut(auth)
     .then(() => {
       // Sign-out successful.
       setLoading(false);
       console.log("USER SIGNED OUT");
-      navigation.navigate(redirect);
+      if (params !== null) {
+        navigation.navigate(redirect, params);
+      } else {
+        navigation.navigate(redirect);
+      }
     })
     .catch((error) => {
       // An error happened.
@@ -1734,6 +1650,7 @@ export async function firebase_GetMe(uid) {
       ...docSnap.data(),
     };
     me = user;
+    console.log(me);
   } else {
     // docSnap.data() will be undefined in this case
     console.log("No such document!");
@@ -1755,6 +1672,7 @@ export async function firebase_GetDocument(
     };
     setter(thing);
     setLoading(false);
+    return thing;
   } else {
     // docSnap.data() will be undefined in this case
     console.log("No such document!");
@@ -1809,7 +1727,7 @@ export async function firebase_GetAllDocuments(
     };
     things.push(thing);
   });
-
+  console.log(things);
   setter(things);
   setLoading(false);
 }
@@ -1890,36 +1808,57 @@ export async function firebase_UpdateToken(token) {
   });
 }
 export async function storage_UploadImage(setLoading, image, path) {
-  setLoading(true);
-  try {
-    // Convert the data URL to a Blob
-    const imageBlob = await fetch(image).then((res) => res.blob());
+  return new Promise(async (resolve, reject) => {
+    setLoading(true);
+    try {
+      // Convert the data URL to a Blob
+      const imageBlob = await fetch(image).then((res) => res.blob());
 
-    // Upload the Blob to Firebase Storage
-    const storageRef = ref(storage, path);
-    const uploadTask = uploadBytesResumable(storageRef, imageBlob);
+      // Upload the Blob to Firebase Storage
+      const storageRef = ref(storage, path);
+      const uploadTask = uploadBytesResumable(storageRef, imageBlob);
 
-    // Listen for state changes, errors, and completion of the upload.
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        // Handle progress changes, if needed
-        const progress =
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        console.log(`Upload is ${progress}% done`);
-      },
-      (error) => {
-        // Handle errors
-        console.error("Error uploading image:", error);
-        setLoading(false); // Update loading state in case of an error
-      },
-      async () => {
-        // Handle successful completion
-        setLoading(false); // Update loading state
-      }
-    );
-  } catch (error) {
-    console.error("Error creating document: ", error);
-    setLoading(false); // Update loading state in case of an error
-  }
+      // Listen for state changes, errors, and completion of the upload.
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          // Handle progress changes, if needed
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          console.log(`Upload is ${progress}% done`);
+        },
+        (error) => {
+          // Handle errors
+          console.error("Error uploading image:", error);
+          setLoading(false); // Update loading state in case of an error
+          reject(error);
+        },
+        async () => {
+          // Handle successful completion
+          setLoading(false); // Update loading state
+          resolve(); // Resolve the promise to indicate completion
+        }
+      );
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      setLoading(false); // Update loading state in case of an error
+      reject(error);
+    }
+  });
+}
+export async function storage_GetImage(setLoading, path, setter) {
+  const storageRef = ref(storage, path);
+  getDownloadURL(storageRef)
+    .then((url) => {
+      // Image has been successfully loaded
+      setter(url);
+    })
+    .catch((error) => {
+      // Handle any errors
+      console.error("Error loading image:", error);
+    })
+    .finally(() => {
+      // Update loading state when the operation is complete
+      setLoading(false);
+    });
 }
